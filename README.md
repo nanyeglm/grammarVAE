@@ -21,141 +21,7 @@ grammarVAE_train
 └─ zinc_grammar_dataset.h5
 ```
 
-## 二、核心文件及其作用
-
-以下是项目中与分子训练相关的核心文件和目录，以及它们的具体作用：
-
-### 1. **`data` 目录**
-
-- `250k_rndm_zinc_drugs_clean.smi`:包含250,000个经过清洗的ZINC分子库中的SMILES字符串。
-
-### 2. **`models` 目录**
-
- 存放VAE模型的定义和相关工具。
-
-- **`model_zinc.py`**: 定义基于语法（Grammar-based）的ZINC分子VAE模型。包含VAE模型的架构定义（编码器和解码器）、损失函数等。
-
-- **`model_zinc_str.py`**: 定义基于字符串（String-based）的ZINC分子VAE模型。 类似于`model_zinc.py`，但不使用语法规则，而是直接基于字符进行编码和解码。
-
-- **`utils.py`**:  包含辅助函数，如数据预处理、模型加载与保存、评估指标计算等。
-
-### 3. **`molecule_optimization` 目录**
-
- 负责分子的优化过程，尤其是通过贝叶斯优化在潜在空间中搜索最佳分子。
-
-#### 子目录和文件详解
-
-##### a. **`latent_features_and_targets_character`** 和 **`latent_features_and_targets_grammar`**
-
- 这两个子目录分别对应于基于字符和基于语法的VAE模型生成的潜在特征和目标属性。
-
-- **`fpscores.pkl.gz`**: 压缩的Pickle文件，包含分子的指纹评分（Fingerprint Scores）。在优化过程中，用于评估分子的属性，如合成可行性（SA score）。
-
-- **`generate_latent_features_and_targets.py`**
-       1. 加载分子数据集（SMILES字符串）。
-       2. 使用训练好的VAE模型将分子编码为潜在向量。
-       3. 计算分子的目标属性（如SA score）。
-       4. 保存潜在向量和目标属性，供贝叶斯优化使用。
-
-- **`sascorer.py`**:用于计算分子的合成可行性评分（SA score）。 提供计算分子SA score的函数，评分越高，合成难度越大。
-
-##### b. **`molecule_images`**
-
- 存储优化过程中发现的最佳分子的图像表示。
-
-- **`best_character_molecule.svg`**: 使用基于字符的VAE模型在优化过程中找到的最佳分子的SVG图像。
-
-- **`best_grammar_molecule.svg`**: 使用基于语法的VAE模型在优化过程中找到的最佳分子的SVG图像。
-
-##### c. **`simulation1` 至 `simulation10`**
-
- 这些子目录代表了10次独立的贝叶斯优化实验（模拟）。每个模拟目录下包含两个子目录：`character` 和 `grammar`，分别对应于基于字符和基于语法的VAE模型。
-
-- `simulationX/character` 和 `simulationX/grammar`
-
-  - **`results/dummy_file.txt`**:实际使用中存储优化过程中生成的结果数据，如每一步的分子及其属性。
-
-  - **`fpscores.pkl.gz`**: 与顶层`latent_features_and_targets_*`目录中的`fpscores.pkl.gz`相同，包含分子的指纹评分。
-
-  - **`gauss.py`**: 实现高斯过程（Gaussian Process）相关功能，用于贝叶斯优化中的代理模型构建。
- 定义和训练高斯过程回归模型，预测潜在空间中的目标函数值。
-
-  - **`random_seed.txt`**: 存储本次模拟使用的随机种子，以确保结果的可复现性。
-
-  - **`run_bo.py`**: 核心的贝叶斯优化脚本，用于执行优化过程。
-      1. 初始化贝叶斯优化过程。
-
-      2. 选择下一个采样点（潜在向量）。
-
-      3. 评估目标函数（如SA score）。
-
-      4. 更新代理模型（高斯过程）。
-
-      5. 迭代优化，直到达到预定的步数或终止条件。
-- **`sascorer.py`**: 与顶层的`sascorer.py`相同，用于计算分子的合成可行性评分。
-
-  - **`sparse_gp.py`**: 实现稀疏高斯过程（Sparse Gaussian Process），用于处理大规模数据集并提高计算效率,定义稀疏高斯过程模型，训练和预测目标函数值。
-
-  - **`sparse_gp_theano_internal.py`**: 与Theano集成的稀疏高斯过程实现，提供底层计算支持。实现与Theano的接口和计算图，提供高效的稀疏高斯过程计算方法。
-
-##### d. **`get_average_test_RMSE_LL.sh`**
-
-- **说明**: Shell脚本，用于计算和汇总所有模拟实验的平均测试均方根误差（RMSE）和对数似然（LL）。
-      1. 遍历所有`simulation*`目录下的`results`文件。
-      2. 提取每个模拟的RMSE和LL值。
-      3. 计算并输出平均值，以评估优化算法的整体性能。
-
-##### e. **`get_final_results.py`**
-
-- **说明**: Python脚本，用于从所有模拟实验中提取和汇总最终结果，生成综合报告。
-       1. 遍历所有`simulation*`目录。
-       2. 提取每个模拟的最佳分子及其属性。
-       3. 汇总所有模拟的最佳分子，生成最终报告（如`final_results.pkl`）。
-
-### 4. **根目录**
-
-- **`encode_decode_zinc.py`**: 用于使用训练好的VAE模型对SMILES字符串进行编码和解码。
-      1. 加载预训练的VAE模型（位于`pretrained`目录）。
-      2. 读取示例SMILES字符串。
-      3. 编码SMILES字符串为潜在向量。
-      4. 解码潜在向量回SMILES字符串。
-      5. 显示编码和解码的结果。
-
-- **`make_zinc_dataset_grammar.py`**: 用于生成适用于基于语法的VAE模型的ZINC分子数据集。
-      1. 读取`data/250k_rndm_zinc_drugs_clean.smi`中的SMILES字符串。
-      2. 进行语法解析和预处理。
-      3. 保存处理后的数据集（如`data/eq2_grammar_dataset.h5`）。
-
-- **`make_zinc_dataset_str.py`**: 用于生成适用于基于字符串的VAE模型的ZINC分子数据集。
-      1. 读取`data/250k_rndm_zinc_drugs_clean.smi`中的SMILES字符串。
-      2. 进行字符串预处理（如字符分割）。
-      3. 保存处理后的数据集（如`data/eq2_str_dataset.h5`）。
-
-- **`molecule_vae.py`**: 用于实现分子的VAE模型，包括编码和解码功能。
-      1. 定义VAE的编码器和解码器结构。
-      2. 提供编码（SMILES → latent vector）和解码（latent vector → SMILES）的函数。
-      3. 加载和保存模型权重。
-
-- **`train_zinc.py`**: 用于训练基于语法的ZINC分子VAE模型。
-      1. 加载生成的基于语法的数据集。
-      2. 初始化基于语法的VAE模型。
-      3. 训练模型，并保存训练好的模型权重至`models`目录。
-
-- **`train_zinc_str.py`**: 用于训练基于字符串的ZINC分子VAE模型。
-      1. 加载生成的基于字符串的数据集。
-      2. 初始化基于字符串的VAE模型。
-      3. 训练模型，并保存训练好的模型权重至`models`目录。
-
-- **`zinc_grammar.py`**可能包含与基于语法的ZINC模型相关的辅助功能或配置。 提供配置参数、辅助函数或其他支持代码，具体内容需查看脚本内部。
-
-### 5. **`pretrained` 目录**
-
- 存放预训练的VAE模型文件，供快速编码/解码和实验使用。
-
-- **`zinc_vae_grammar_L56_E100_val.hdf5`**: 基于语法的VAE模型预训练权重文件。直接用于编码和解码SMILES字符串，节省训练时间。
-- **`zinc_vae_str_L56_E100_val.hdf5`**: 基于字符串的VAE模型预训练权重文件。直接用于编码和解码SMILES字符串，节省训练时间。
-
-# 三.项目复现指南
+# 二.项目复现指南
 
 为了有效地使用**grammarVAE**项目进行分子训练和优化，需按照以下步骤依次运行相关文件。每一步的文件及其使用场景如下：
 
@@ -388,7 +254,7 @@ Encoded Latent Vector: [ ... ]
 Decoded SMILES: CCO
 ```
 
-## 五、总结
+## 三、总结
 
 通过上述步骤和详细说明，你可以系统地使用**grammarVAE**项目进行分子VAE模型的训练和优化。以下是关键点的总结：
 
@@ -408,4 +274,3 @@ Decoded SMILES: CCO
 - [ ] 优化项目依赖包版本,迁移原项目开发环境至Python 3.10 + TF2.18 + Keras3.7 + CUDA加速
 - [ ] 整合该项目到DLEPS项目中
 - [ ] 优化项目代码结构，将相关模块进行封装，提高代码可读性、可维护性
-
