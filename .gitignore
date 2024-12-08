@@ -180,3 +180,4 @@ cython_debug/
 
 pretrained
 /*.h5
+*.bak
