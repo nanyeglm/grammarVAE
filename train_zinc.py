@@ -149,7 +149,7 @@ def main():
         + str(args.latent_dim)
         + "_E"
         + str(args.epochs)
-        + "_val.hdf5"
+        + "_val.pt"
     )
     print(model_save)
 
