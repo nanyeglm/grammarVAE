@@ -1,3 +1,4 @@
+# # models/model_zinc.py
 # import copy
 # from keras import backend as K
 # from keras import objectives
@@ -21,14 +22,14 @@
 # class MoleculeVAE():
 
 #     autoencoder = None
-    
+
 #     def create(self,
 #                charset,
 #                max_length = MAX_LEN,
 #                latent_rep_size = 2,
 #                weights_file = None):
 #         charset_length = len(charset)
-        
+
 #         x = Input(shape=(max_length, charset_length))
 #         _, z = self._buildEncoder(x, latent_rep_size, max_length)
 #         self.encoder = Model(x, z)
@@ -82,7 +83,7 @@
 #         z_mean = Dense(latent_rep_size, name='z_mean', activation = 'linear')(h)
 #         z_log_var = Dense(latent_rep_size, name='z_log_var', activation = 'linear')(h)
 
-#         return (z_mean, z_log_var) 
+#         return (z_mean, z_log_var)
 
 
 #     def _buildEncoder(self, x, latent_rep_size, max_length, epsilon_std = 0.01):
@@ -108,7 +109,7 @@
 #             most_likely = K.argmax(x_true)
 #             most_likely = tf.reshape(most_likely,[-1]) # flatten most_likely
 #             ix2 = tf.expand_dims(tf.gather(ind_of_ind_K, most_likely),1) # index ind_of_ind with res
-#             ix2 = tf.cast(ix2, tf.int32) # cast indices as ints 
+#             ix2 = tf.cast(ix2, tf.int32) # cast indices as ints
 #             M2 = tf.gather_nd(masks_K, ix2) # get slices of masks_K with indices
 #             M3 = tf.reshape(M2, [-1,MAX_LEN,DIM]) # reshape them
 #             P2 = tf.mul(K.exp(x_pred),M3) # apply them to the exp-predictions
@@ -135,17 +136,12 @@
 
 #     def save(self, filename):
 #         self.autoencoder.save_weights(filename)
-    
+
 #     def load(self, charset, weights_file, latent_rep_size = 2, max_length=MAX_LEN):
 #         self.create(charset, max_length = max_length, weights_file = weights_file, latent_rep_size = latent_rep_size)
 
 
-
-
-
-
-# model_zinc.py (PyTorch version with GPU-compatible indexing)
-
+# models/model_zinc.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -167,48 +163,50 @@ class MoleculeVAE(nn.Module):
         self.epsilon_std = epsilon_std
         self.charset_length = len(charset)
 
-        # 将 grammar 中的 masks 和 ind_of_ind 注册为 buffer
-        # 这样当 model.to(device) 时，会自动迁移到对应设备
+        # 注册masks和ind_of_ind为buffer
         self.register_buffer("masks", torch.tensor(G.masks, dtype=torch.float32))
         self.register_buffer("ind_of_ind", torch.tensor(G.ind_of_ind, dtype=torch.long))
 
-        # Encoder网络结构
-        # 输入 (batch, max_length, charset_length) 转为 (batch, charset_length, max_length)
-        self.conv1 = nn.Conv1d(
+        # 对应Keras层命名和结构:
+        # Encoder部分
+        self.conv_1 = nn.Conv1d(
             in_channels=self.charset_length, out_channels=9, kernel_size=9
         )
-        self.conv2 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=9)
-        self.conv3 = nn.Conv1d(in_channels=9, out_channels=10, kernel_size=11)
-
-        # 计算卷积输出维度:
-        # after conv1: length = 277-9+1=269
-        # after conv2: length = 269-9+1=261
-        # after conv3: length = 261-11+1=251
-        # total = 10*251=2510
+        self.conv_2 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=9)
+        self.conv_3 = nn.Conv1d(in_channels=9, out_channels=10, kernel_size=11)
+        # flatten_1 对应 flatten操作，不是独立层，在forward中实现
+        # dense_1
+        # 卷积输出长度计算: (参见原说明)
+        # after conv1: 277-9+1=269
+        # after conv2: 269-9+1=261
+        # after conv3: 261-11+1=251
         conv_out_dim = 10 * 251
+        self.dense_1 = nn.Linear(conv_out_dim, 435)
 
-        self.fc_hidden = nn.Linear(conv_out_dim, 435)
+        # z_mean, z_log_var
         self.z_mean = nn.Linear(435, latent_rep_size)
         self.z_log_var = nn.Linear(435, latent_rep_size)
 
-        # Decoder网络结构
-        self.decoder_input = nn.Linear(latent_rep_size, latent_rep_size)
+        # Decoder部分
+        self.latent_input = nn.Linear(latent_rep_size, latent_rep_size)
+        # repeat_vector 不存在独立层，在forward中用repeat实现
         self.gru_1 = nn.GRU(
             input_size=latent_rep_size, hidden_size=501, batch_first=True
         )
         self.gru_2 = nn.GRU(input_size=501, hidden_size=501, batch_first=True)
         self.gru_3 = nn.GRU(input_size=501, hidden_size=501, batch_first=True)
-        self.fc_out = nn.Linear(501, self.charset_length)
+        self.decoded_mean = nn.Linear(501, self.charset_length)
 
     def encode(self, x):
         # x: (batch, max_length, charset_length)
-        x = x.permute(0, 2, 1)  # 转换为 (batch, charset_length, max_length)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-
+        # 转置为 (batch, charset_length, max_length)
+        x = x.permute(0, 2, 1)
+        x = F.relu(self.conv_1(x))
+        x = F.relu(self.conv_2(x))
+        x = F.relu(self.conv_3(x))
+        # flatten_1
         x = x.contiguous().view(x.size(0), -1)
-        x = F.relu(self.fc_hidden(x))
+        x = F.relu(self.dense_1(x))
         z_mean = self.z_mean(x)
         z_log_var = self.z_log_var(x)
         return z_mean, z_log_var
@@ -219,12 +217,14 @@ class MoleculeVAE(nn.Module):
         return z
 
     def decode(self, z):
-        z = F.relu(self.decoder_input(z))
-        z = z.unsqueeze(1).repeat(1, self.max_length, 1)
-        out, _ = self.gru_1(z)
-        out, _ = self.gru_2(out)
-        out, _ = self.gru_3(out)
-        out = self.fc_out(out)  # (batch, max_length, charset_length)
+        h = F.relu(self.latent_input(z))
+        # repeat_vector
+        h = h.unsqueeze(1).repeat(1, self.max_length, 1)
+        h, _ = self.gru_1(h)
+        h, _ = self.gru_2(h)
+        h, _ = self.gru_3(h)
+        # decoded_mean
+        out = self.decoded_mean(h)
         return out
 
     def forward(self, x):
@@ -234,36 +234,23 @@ class MoleculeVAE(nn.Module):
         return x_decoded_logits, z_mean, z_log_var
 
     def conditional(self, x_true, x_pred):
-        # x_true, x_pred: (batch, max_length, charset_length)
+        # 还原原始conditional逻辑
         batch = x_true.size(0)
         max_length = x_true.size(1)
-
         most_likely = torch.argmax(x_true, dim=-1)  # (batch, max_length)
         most_likely = most_likely.view(-1)  # (batch*max_length)
-
-        # 使用 ind_of_ind 索引，需确保 ind_of_ind 已在同一设备上
-        ix2 = self.ind_of_ind[most_likely].unsqueeze(1)  # (batch*max_length,1)
-
-        # 根据 ix2 从 masks 中 gather 相应行
-        # ix2.squeeze(1)是 (batch*max_length,)
-        M2 = self.masks[ix2.squeeze(1), :]  # (batch*max_length, D)
-
-        # reshape 回 (batch, max_length, DIM)
+        ix2 = self.ind_of_ind[most_likely].unsqueeze(1)
+        M2 = self.masks[ix2.squeeze(1), :]  # (batch*max_length, DIM)
         M3 = M2.view(batch, max_length, DIM)
-
         P2 = torch.exp(x_pred) * M3
         P2 = P2 / (P2.sum(dim=-1, keepdim=True) + 1e-8)
         return P2
 
     def vae_loss(self, x, x_decoded_logits, z_mean, z_log_var):
-        # 应用conditional函数
+        # 与原Keras版本对应的loss
         x_decoded_mean = self.conditional(x, x_decoded_logits)
-
-        # flatten
         x_flat = x.view(-1)
         x_decoded_flat = x_decoded_mean.view(-1)
-
-        # binary cross entropy
         recon_loss = (
             F.binary_cross_entropy(x_decoded_flat, x_flat, reduction="mean")
             * self.max_length
@@ -272,3 +259,45 @@ class MoleculeVAE(nn.Module):
             1 + z_log_var - z_mean.pow(2) - torch.exp(z_log_var)
         )
         return recon_loss + kl_loss, recon_loss, kl_loss
+
+
+class WrapperMoleculeVAE(object):
+    # 为了保持与原始代码中MoleculeVAE类的接口一致（.create, .load），提供一个外层封装
+    def __init__(self):
+        self.autoencoder = None
+        self.encoder = None
+        self.decoder = None
+        self.encoderMV = None
+        self.model = None
+
+    def create(self, charset, max_length=MAX_LEN, latent_rep_size=2, weights_file=None):
+        # 创建PyTorch模型
+        self.model = MoleculeVAE(
+            charset, max_length=max_length, latent_rep_size=latent_rep_size
+        )
+
+        # 无法直接使用原Keras的load_weights，对于完全一致的权重兼容很难
+        # 这里如果提供weights_file是Keras的hdf5文件，就无法直接加载
+        # 如需加载torch权重可以torch.load()
+
+        # 与Keras接口保持一致：encoder, decoder, encoderMV
+        # encoder: 输入x -> z
+        # decoder: 输入z -> x_decoded
+        # encoderMV: 输入x -> (z_mean, z_log_var)
+        # 在Pytorch中可用model内部方法替代，但这里为接口一致性，不实际分拆模型。
+        # 实际使用中，可以在forward中实现encoder、decoder逻辑，也可单独写出子module。
+        self.autoencoder = self.model
+        # 暂不完全拆分encoder和decoder为独立model，但保持接口占位
+
+        # 优化器与compile等在train中完成，这里不调用。
+
+    def load(self, charset, weights_file, latent_rep_size=2, max_length=MAX_LEN):
+        self.create(charset, max_length=max_length, latent_rep_size=latent_rep_size)
+        # 无法直接加载Keras权重，但接口保留
+        # 若有相应torch权重可执行:
+        # self.model.load_state_dict(torch.load(weights_file))
+        pass
+
+    def save(self, filename):
+        # 保存当前模型的state_dict
+        torch.save(self.model.state_dict(), filename)
