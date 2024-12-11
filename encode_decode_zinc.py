@@ -1,7 +1,7 @@
-import sys
+# encode_decode_zinc.py
+
 #sys.path.insert(0, '..')
 import molecule_vae
-import numpy as np
 
 # 1. load grammar VAE
 grammar_weights = "pretrained/zinc_vae_grammar_L56_E100_val.hdf5"

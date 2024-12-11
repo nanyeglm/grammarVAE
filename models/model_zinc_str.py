@@ -1,13 +1,12 @@
-import copy
+# models/model_zinc_str.py
 from keras import backend as K
 from keras import objectives
 from keras.models import Model
 from keras.layers import Input, Dense, Lambda
-from keras.layers.core import Dense, Activation, Flatten, RepeatVector
+from keras.layers.core import Dense, Flatten, RepeatVector
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.recurrent import GRU
 from keras.layers.convolutional import Convolution1D
-import pdb
 
 class MoleculeVAE():
 

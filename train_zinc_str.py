@@ -1,4 +1,4 @@
-
+# train_zinc_str.py
 
 import argparse
 import os

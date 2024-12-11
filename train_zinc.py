@@ -1,4 +1,4 @@
-
+# train_zinc.py
 
 import argparse
 import os
@@ -10,7 +10,6 @@ from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
 import h5py
 import zinc_grammar as G
-import pdb
 
 
 rules = G.gram.split('\n')
