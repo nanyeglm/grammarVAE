@@ -141,7 +141,7 @@
 #         self.create(charset, max_length = max_length, weights_file = weights_file, latent_rep_size = latent_rep_size)
 
 
-# models/model_zinc.py
+# models/model_zinc_pytorch.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

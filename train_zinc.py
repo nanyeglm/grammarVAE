@@ -85,7 +85,7 @@
 
 
 
-# train_zinc.py
+# train_zinc_pytorch.py
 import argparse
 import os
 import h5py

@@ -9,7 +9,6 @@ from models.model_zinc_str import MoleculeVAE
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
 import h5py
-import pdb
 
 charset = ['C', '(', ')', 'c', '1', '2', 'o', '=', 'O', 'N', '3', 'F', '[', '@', 'H', ']', 'n', '-', '#', 'S', 'l', '+', 's', 'B', 'r', '/', '4', '\\', '5', '6', '7', 'I', 'P', '8', ' ']
 
